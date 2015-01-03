@@ -7,8 +7,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-//using Gma.UserActivityMonitor;
+using Gma.UserActivityMonitor;
 using CoreAudioApi;
+using Microsoft.Win32;
 
 namespace VolumeHooker
 {
@@ -19,15 +20,26 @@ namespace VolumeHooker
         private Color bg = SystemColors.InactiveCaptionText;
         private SolidBrush brush = new SolidBrush(Color.White);
         private int y;
+        Timer timer1;
+
+        // The path to the key where Windows looks for startup applications
+        RegistryKey rkApp = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
 
         public Form1()
         {
             InitializeComponent();
+
+            checkAutoRun();
+
+            timer1 = new Timer();
+            timer1.Interval = 400;
+            timer1.Tick += timer1_Tick;
+
             pictureBox1.Image = new Bitmap(30, 120);
             g = Graphics.FromImage(pictureBox1.Image);
 
-            //HookManager.KeyDown += HookManager_KeyDown;
-            //HookManager.KeyUp += HookManager_KeyUp;
+            HookManager.KeyDown += HookManager_KeyDown;
+            HookManager.KeyUp += HookManager_KeyUp;
 
             MMDeviceEnumerator DevEnum = new MMDeviceEnumerator();
             device = DevEnum.GetDefaultAudioEndpoint(EDataFlow.eRender, ERole.eMultimedia);
@@ -35,9 +47,29 @@ namespace VolumeHooker
             device.AudioEndpointVolume.OnVolumeNotification += new AudioEndpointVolumeNotificationDelegate(AudioEndpointVolume_OnVolumeNotification);
         }
 
-        private void Form1_Load(object sender, EventArgs e)
+        private void checkAutoRun()
         {
-            
+            // Check to see the current state (running at startup or not)
+            if (rkApp.GetValue("VolumeHook") == null)
+            {
+                // The value doesn't exist, the application is not set to run at startup
+                menu_runOnStartup.Checked = false;
+            }
+            else
+            {
+                // The value exists, the application is set to run at startup
+                menu_runOnStartup.Checked = true;
+            }
+        }
+
+        void timer1_Tick(object sender, EventArgs e)
+        {
+            timer1.Stop();
+            while (this.Opacity != 0)
+            {
+                this.Opacity -= 0.05;
+                System.Threading.Thread.Sleep(10);
+            }
         }
 
         void AudioEndpointVolume_OnVolumeNotification(AudioVolumeNotificationData data)
@@ -56,14 +88,23 @@ namespace VolumeHooker
 
         private void HookManager_KeyDown(object sender, KeyEventArgs e)
         {
-            int val = (int)(device.AudioEndpointVolume.MasterVolumeLevelScalar * 100);
-            //notifyIcon1.BalloonTipTitle = "KeyboardHook";
-            //notifyIcon1.BalloonTipText = string.Format("KeyDown - {0} - {1}", e.KeyCode, val);
+            if ((e.KeyCode == Keys.VolumeUp) || (e.KeyCode == Keys.VolumeDown))
+            {
+                timer1.Stop();
+                while (this.Opacity != 1)
+                {
+                    this.Opacity += 0.10;
+                    System.Threading.Thread.Sleep(10);
+                }
+            }
         }
 
         private void HookManager_KeyUp(object sender, KeyEventArgs e)
         {
-
+            if ((e.KeyCode == Keys.VolumeUp) || (e.KeyCode == Keys.VolumeDown))
+            {
+                timer1.Start();
+            }
         }
 
         private void pictureBox1_MouseDown(object sender, MouseEventArgs e)
@@ -114,12 +155,25 @@ namespace VolumeHooker
 
         private void exitToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            HookManager.KeyDown -= HookManager_KeyDown;
+            HookManager.KeyUp -= HookManager_KeyUp;
             Application.Exit();
         }
 
-        private void pictureBox1_Click(object sender, EventArgs e)
+        private void menu_runOnStartup_Click(object sender, EventArgs e)
         {
-
+            if (!menu_runOnStartup.Checked)
+            {
+                menu_runOnStartup.Checked = true;
+                // Add the value in the registry so that the application runs at startup
+                rkApp.SetValue("VolumeHook", Application.ExecutablePath.ToString());
+            }
+            else
+            {
+                menu_runOnStartup.Checked = false;
+                // Remove the value from the registry so that the application doesn't start
+                rkApp.DeleteValue("VolumeHook", false);
+            }
         }
     }
 }
