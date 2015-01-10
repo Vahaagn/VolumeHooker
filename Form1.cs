@@ -19,7 +19,7 @@ namespace VolumeHooker
         private Graphics g;
         private Color bg = SystemColors.InactiveCaptionText;
         private SolidBrush brush = new SolidBrush(Color.White);
-        private int y;
+        private float y;
         Timer timer1;
 
         // The path to the key where Windows looks for startup applications
@@ -43,7 +43,7 @@ namespace VolumeHooker
 
             MMDeviceEnumerator DevEnum = new MMDeviceEnumerator();
             device = DevEnum.GetDefaultAudioEndpoint(EDataFlow.eRender, ERole.eMultimedia);
-            DrawVolume((int)(device.AudioEndpointVolume.MasterVolumeLevelScalar * 100));
+            DrawVolume(device.AudioEndpointVolume.MasterVolumeLevelScalar);
             device.AudioEndpointVolume.OnVolumeNotification += new AudioEndpointVolumeNotificationDelegate(AudioEndpointVolume_OnVolumeNotification);
         }
 
@@ -82,7 +82,7 @@ namespace VolumeHooker
             }
             else
             {
-                DrawVolume((int)(data.MasterVolume * 100));
+                DrawVolume(data.MasterVolume);
             }
         }
 
@@ -111,7 +111,7 @@ namespace VolumeHooker
         {
             if (e.Button == System.Windows.Forms.MouseButtons.Left)
             {
-                DrawVolume(100 - e.Location.Y);
+                DrawVolume((float)(100 - e.Location.Y)/100);
                 SetVolume();
             }
         }
@@ -120,25 +120,25 @@ namespace VolumeHooker
         {
             if (e.Button == System.Windows.Forms.MouseButtons.Left)
             {
-                DrawVolume(100 - e.Location.Y);
+                DrawVolume((float)(100 - e.Location.Y) / 100);
                 SetVolume();
             }
         }
 
         private void SetVolume()
         {
-            device.AudioEndpointVolume.MasterVolumeLevelScalar = ((float)y / 100.0f);
+            device.AudioEndpointVolume.MasterVolumeLevelScalar = y;
         }
 
-        private void DrawVolume(int vol)
+        private void DrawVolume(float vol)
         {
-            if ((vol >= 0) && (vol <= 100))
+            if ((vol >= 0) && (vol <= 1))
                 y = vol;
-            else if (vol > 100)
-                y = 100;
+            else if (vol > 1)
+                y = 1;
             else
                 y = 0;
-            label1.Text = String.Format("{0}%", y);
+            label1.Text = String.Format("{0}%", (int)(Math.Round(y*100)));
             Draw();
         }
 
@@ -146,7 +146,7 @@ namespace VolumeHooker
         {
             g.Clear(bg);
             
-            g.FillRectangle(brush, new Rectangle(0, 100 - y, 25, 100));
+            g.FillRectangle(brush, new Rectangle(0, 100 - (int)(y*100), 25, 100));
             //brush.Dispose();
             //g.Dispose();
 
